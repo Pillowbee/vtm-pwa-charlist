@@ -1,5 +1,7 @@
 # Kindred character list
 
+**[Открыть приложение](https://pillowbee.github.io/vtm-pwa-charlist/)**
+
 ## Run on your phone (same Wi-Fi)
 
 Run this on the computer hosting the app:
