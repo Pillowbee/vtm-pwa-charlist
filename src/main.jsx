@@ -78,6 +78,6 @@ function Section({ title, children }) { return <section className="section"><h2>
 
 createRoot(document.getElementById('root')).render(<App />)
 if ('serviceWorker' in navigator) addEventListener('load', () => {
-  if (import.meta.env.PROD) navigator.serviceWorker.register('/sw.js')
+  if (import.meta.env.PROD) navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`)
   else navigator.serviceWorker.getRegistrations().then(registrations => registrations.forEach(registration => registration.unregister()))
 })
