@@ -2,6 +2,10 @@
 
 **[Открыть приложение](https://pillowbee.github.io/vtm-pwa-charlist/)**
 
+## Резервные копии
+
+На главном экране доступны кнопки **Экспорт** и **Импорт**. Экспорт скачивает JSON-файл со всеми персонажами; импорт добавляет персонажей из такого файла к текущему списку и не удаляет имеющиеся записи. Делайте экспорт перед очисткой данных браузера или сменой устройства.
+
 ## Run on your phone (same Wi-Fi)
 
 Run this on the computer hosting the app:
@@ -31,3 +35,10 @@ npm run build
 ```
 
 Upload the generated `dist` directory to any static host, such as GitHub Pages, Cloudflare Pages, Netlify, or Vercel. Use HTTPS in production so the service worker and installable PWA features are enabled.
+
+For a site hosted below a subpath, pass that path while building, for example:
+
+```bash
+$env:BASE_PATH = "/my-site/"
+npm run build
+```

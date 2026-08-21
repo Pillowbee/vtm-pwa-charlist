@@ -1,341 +1,98 @@
 import { createRoot } from "react-dom/client";
-import { useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
+import { Field, Score, Section, Select, Text } from "./components";
+import {
+  archetypes,
+  addCharacter,
+  clans,
+  createCharacter,
+  groups,
+  removeCharacter,
+  ru,
+  skills,
+  type Character,
+  type ScoreType,
+  updateCharacter,
+} from "./domain";
+import {
+  createBackup,
+  ensureUniqueIds,
+  loadCharacters,
+  parseBackup,
+  saveCharacters,
+} from "./storage";
 import "./style.css";
 
-const KEY = "vtm20-characters";
-
-const clans = [
-  "Ассамиты",
-  "Бруха",
-  "Вентру",
-  "Гангрелы",
-  "Джованни",
-  "Каитиффы",
-  "Ласомбра",
-  "Малкавиане",
-  "Носферату",
-  "Последователи Сета",
-  "Равнос",
-  "Тореадоры",
-  "Тремеры",
-  "Тцимисхи",
-] as const;
-
-const archetypes = [
-  "Авантюрист",
-  "Анархист",
-  "Архитектор",
-  "Бонвиван",
-  "Бравёр",
-  "Выживальщик",
-  "Гедонист",
-  "Директор",
-  "Защитник",
-  "Идеалист",
-  "Искатель острых ощущений",
-  "Критик",
-  "Мазохист",
-  "Мученик",
-  "Одиночка",
-  "Опекун",
-  "Оптимист",
-  "Перфекционист",
-  "Победитель",
-  "Подхалим",
-  "Проказник",
-  "Ребёнок",
-  "Рыцарь",
-  "Судья",
-  "Традиционалист",
-  "Фанатик",
-] as const;
-
-const groups = {
-  Physical: ["Strength", "Dexterity", "Stamina"],
-  Social: ["Charisma", "Manipulation", "Appearance"],
-  Mental: ["Perception", "Intelligence", "Wits"],
-} as const;
-
-const skills = {
-  Talents: [
-    "Alertness",
-    "Athletics",
-    "Awareness",
-    "Brawl",
-    "Empathy",
-    "Expression",
-    "Intimidation",
-    "Leadership",
-    "Streetwise",
-    "Subterfuge",
-  ],
-  Skills: [
-    "Animal Ken",
-    "Crafts",
-    "Drive",
-    "Etiquette",
-    "Firearms",
-    "Larceny",
-    "Melee",
-    "Performance",
-    "Stealth",
-    "Survival",
-  ],
-  Knowledges: [
-    "Academics",
-    "Computer",
-    "Finance",
-    "Investigation",
-    "Law",
-    "Medicine",
-    "Occult",
-    "Politics",
-    "Science",
-    "Technology",
-  ],
-} as const;
-
-const ru: Record<string, string> = {
-  Physical: "Физические",
-  Social: "Социальные",
-  Mental: "Ментальные",
-  Talents: "Таланты",
-  Skills: "Навыки",
-  Knowledges: "Знания",
-  Strength: "Сила",
-  Dexterity: "Ловкость",
-  Stamina: "Выносливость",
-  Charisma: "Харизма",
-  Manipulation: "Манипулирование",
-  Appearance: "Внешность",
-  Perception: "Восприятие",
-  Intelligence: "Интеллект",
-  Wits: "Смекалка",
-  Alertness: "Бдительность",
-  Athletics: "Атлетика",
-  Awareness: "Осведомлённость",
-  Brawl: "Драка",
-  Empathy: "Эмпатия",
-  Expression: "Экспрессия",
-  Intimidation: "Запугивание",
-  Leadership: "Лидерство",
-  Streetwise: "Знание улиц",
-  Subterfuge: "Хитрость",
-  "Animal Ken": "Знание животных",
-  Crafts: "Ремесло",
-  Drive: "Вождение",
-  Etiquette: "Этикет",
-  Firearms: "Стрельба",
-  Larceny: "Воровство",
-  Melee: "Фехтование",
-  Performance: "Исполнительство",
-  Stealth: "Скрытность",
-  Survival: "Выживание",
-  Academics: "Академические знания",
-  Computer: "Компьютер",
-  Finance: "Финансы",
-  Investigation: "Расследование",
-  Law: "Право",
-  Medicine: "Медицина",
-  Occult: "Оккультизм",
-  Politics: "Политика",
-  Science: "Наука",
-  Technology: "Технология",
-};
-
-type Scores = Record<string, number>;
-type ScoreCollection = Record<string, readonly string[]>;
-type ScoreType = "attributes" | "abilities";
-
-interface Character {
-  id: string;
-  name: string;
-  clan: string;
-  concept: string;
-  player: string;
-  chronicle: string;
-  nature: string;
-  demeanor: string;
-  generation: string;
-  sire: string;
-  attributes: Scores;
-  abilities: Scores;
-  disciplines: string;
-  backgrounds: string;
-  merits: string;
-  flaws: string;
-  notes: string;
-  humanity: number;
-  willpower: number;
-  blood: number;
-  health: number;
-}
-
-interface ScoreProps {
-  label: string;
-  value: number;
-  min?: number;
-  max?: number;
-  onChange: (value: number) => void;
-}
-
-interface FieldProps {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-}
-
-interface TextProps extends FieldProps {
-  placeholder?: string;
-}
-
-interface SelectProps extends FieldProps {
-  options: readonly string[];
-  placeholder: string;
-}
-
-interface SectionProps {
-  title: string;
-  children: ReactNode;
-}
-
-const emptyScores = (source: ScoreCollection, value: number): Scores =>
-  Object.fromEntries(
-    Object.values(source)
-      .flat()
-      .map((name) => [name, value]),
-  );
-
-const newId = (): string =>
-  crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-
-const fresh = (): Character => ({
-  id: newId(),
-  name: "Безымянный вампир",
-  clan: "",
-  concept: "",
-  player: "",
-  chronicle: "",
-  nature: "",
-  demeanor: "",
-  generation: "",
-  sire: "",
-  attributes: emptyScores(groups, 1),
-  abilities: emptyScores(skills, 0),
-  disciplines: "",
-  backgrounds: "",
-  merits: "",
-  flaws: "",
-  notes: "",
-  humanity: 7,
-  willpower: 5,
-  blood: 0,
-  health: 7,
-});
-
-const load = (): Character[] => {
-  try {
-    const stored: unknown = JSON.parse(localStorage.getItem(KEY) ?? "[]");
-    return Array.isArray(stored) ? (stored as Character[]) : [];
-  } catch {
-    return [];
-  }
-};
-
-function Score({ label, value, min = 0, max = 5, onChange }: ScoreProps) {
-  return (
-    <div className="score">
-      <span>{label}</span>
-      <div>
-        <button
-          onClick={() => onChange(Math.max(min, value - 1))}
-          aria-label={`Уменьшить: ${label}`}
-          disabled={value <= min}
-        >
-          −
-        </button>
-        <b>{value}</b>
-        <button
-          onClick={() => onChange(Math.min(max, value + 1))}
-          aria-label={`Увеличить: ${label}`}
-          disabled={value >= max}
-        >
-          +
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function Field({ label, value, onChange }: FieldProps) {
-  return (
-    <label>
-      {label}
-      <input value={value} onChange={(event) => onChange(event.target.value)} />
-    </label>
-  );
-}
-
-function Select({ label, value, onChange, options, placeholder }: SelectProps) {
-  const hasCustomValue = value !== "" && !options.includes(value);
-
-  return (
-    <label>
-      {label}
-      <select value={value} onChange={(event) => onChange(event.target.value)}>
-        <option value="">{placeholder}</option>
-        {hasCustomValue && <option value={value}>{value}</option>}
-        {options.map((option) => (
-          <option key={option} value={option}>
-            {option}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
-
-function Text({ label, value, onChange, placeholder }: TextProps) {
-  return (
-    <label className="wide">
-      {label}
-      <textarea
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        placeholder={placeholder}
-      />
-    </label>
-  );
-}
-
-function Section({ title, children }: SectionProps) {
-  return (
-    <section className="section">
-      <h2>{title}</h2>
-      {children}
-    </section>
-  );
-}
-
 function App() {
-  const [characters, setCharacters] = useState<Character[]>(load);
+  const [initial] = useState(loadCharacters);
+  const [characters, setCharacters] = useState<Character[]>(initial.characters);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(initial.error);
+  const importInput = useRef<HTMLInputElement>(null);
+  const charactersRef = useRef(characters);
+  const pendingSave = useRef(false);
   const selected = characters.find((character) => character.id === selectedId);
+  charactersRef.current = characters;
 
-  useEffect(() => localStorage.setItem(KEY, JSON.stringify(characters)), [characters]);
+  const savePendingChanges = useCallback(() => {
+    if (!pendingSave.current) return;
+
+    const error = saveCharacters(charactersRef.current);
+    if (error) setNotice(error);
+    else pendingSave.current = false;
+  }, []);
+
+  useEffect(() => {
+    if (!pendingSave.current) return;
+
+    const timeout = window.setTimeout(savePendingChanges, 300);
+    return () => window.clearTimeout(timeout);
+  }, [characters, savePendingChanges]);
+
+  useEffect(() => {
+    window.addEventListener("pagehide", savePendingChanges);
+    return () => window.removeEventListener("pagehide", savePendingChanges);
+  }, [savePendingChanges]);
+
+  const changeCharacters = (change: (all: Character[]) => Character[]) => {
+    pendingSave.current = true;
+    setCharacters(change);
+  };
 
   const update = (change: Partial<Character>) => {
-    setCharacters((all) =>
-      all.map((character) =>
-        character.id === selectedId ? { ...character, ...change } : character,
-      ),
-    );
+    changeCharacters((all) => updateCharacter(all, selectedId, change));
   };
 
   const create = () => {
-    const character = fresh();
-    setCharacters((all) => [character, ...all]);
+    const character = createCharacter();
+    changeCharacters((all) => addCharacter(all, character));
     setSelectedId(character.id);
+  };
+
+  const exportCharacters = () => {
+    const blob = new Blob([createBackup(characters)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "vtm20-персонажи.json";
+    link.click();
+    URL.revokeObjectURL(url);
+    setNotice("Резервная копия скачана.");
+  };
+
+  const importCharacters = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    const result = parseBackup(await file.text());
+    if (result.error) {
+      setNotice(result.error);
+      return;
+    }
+
+    changeCharacters((all) => ensureUniqueIds([...result.characters, ...all]));
+    setNotice(`Импортировано персонажей: ${result.characters.length}.`);
   };
 
   if (!selected) {
@@ -344,18 +101,54 @@ function App() {
         <header>
           <div>
             <p className="eyebrow">Вампир: Маскарад</p>
+            <h1>Персонажи</h1>
           </div>
-          {characters.length > 0 && (
-            <button className="primary" onClick={create}>
-              + Новый
+          <div className="actions">
+            <input
+              ref={importInput}
+              className="visually-hidden"
+              type="file"
+              accept="application/json,.json"
+              onChange={importCharacters}
+              aria-label="Импортировать резервную копию"
+            />
+            <button
+              type="button"
+              className="secondary"
+              onClick={exportCharacters}
+              disabled={!characters.length}
+            >
+              Экспорт
             </button>
-          )}
+            <button
+              type="button"
+              className="secondary"
+              onClick={() => importInput.current?.click()}
+            >
+              Импорт
+            </button>
+            {characters.length > 0 && (
+              <button type="button" className="primary" onClick={create}>
+                + Новый
+              </button>
+            )}
+          </div>
         </header>
-        <p className="intro">Персонажи хранятся только на этом устройстве.</p>
-        <section className="cards">
+        {notice && (
+          <p className="notice" role="status" aria-live="polite">
+            {notice}
+          </p>
+        )}
+        <p className="intro">Персонажи хранятся на этом устройстве. Регулярно делайте экспорт.</p>
+        <section className="cards" aria-label="Список персонажей">
           {characters.map((character) => (
-            <button className="card" key={character.id} onClick={() => setSelectedId(character.id)}>
-              <strong>{character.name}</strong>
+            <button
+              type="button"
+              className="card"
+              key={character.id}
+              onClick={() => setSelectedId(character.id)}
+            >
+              <strong>{character.name || "Безымянный вампир"}</strong>
               <span>
                 {character.clan || "Клан неизвестен"} · {character.concept || "Без концепции"}
               </span>
@@ -363,10 +156,10 @@ function App() {
           ))}
           {!characters.length && (
             <div className="empty">
-              <span>☾</span>
+              <span aria-hidden="true">☾</span>
               <h2>Персонажей пока нет</h2>
               <p>Создайте вампира, чтобы начать хронику.</p>
-              <button className="primary" onClick={create}>
+              <button type="button" className="primary" onClick={create}>
                 Создать персонажа
               </button>
             </div>
@@ -382,14 +175,15 @@ function App() {
   return (
     <main className="app editor">
       <header>
-        <button className="back" onClick={() => setSelectedId(null)}>
+        <button type="button" className="back" onClick={() => setSelectedId(null)}>
           ← Список
         </button>
         <button
+          type="button"
           className="delete"
           onClick={() => {
-            if (confirm(`Удалить «${selected.name}»?`)) {
-              setCharacters((all) => all.filter((character) => character.id !== selectedId));
+            if (window.confirm(`Удалить «${selected.name || "этого персонажа"}»?`)) {
+              changeCharacters((all) => removeCharacter(all, selectedId));
               setSelectedId(null);
             }
           }}
@@ -397,12 +191,15 @@ function App() {
           Удалить
         </button>
       </header>
-      <section className="identity">
+      <section className="identity" aria-label="Основные сведения">
+        <label className="visually-hidden" htmlFor="character-name">
+          Имя персонажа
+        </label>
         <input
+          id="character-name"
           className="name"
           value={selected.name}
           onChange={(event) => update({ name: event.target.value })}
-          aria-label="Имя персонажа"
         />
         <div className="fields">
           <Select
@@ -531,9 +328,10 @@ function App() {
         </div>
       </Section>
       <Section title="Заметки">
-        <textarea
+        <Text
+          label="Заметки персонажа"
           value={selected.notes}
-          onChange={(event) => update({ notes: event.target.value })}
+          onChange={(notes) => update({ notes })}
           placeholder="История, снаряжение, союзники, заметки о кормлении…"
         />
       </Section>
@@ -542,13 +340,3 @@ function App() {
 }
 
 createRoot(document.getElementById("root")!).render(<App />);
-
-if ("serviceWorker" in navigator) {
-  addEventListener("load", () => {
-    if (import.meta.env.PROD) navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`);
-    else
-      navigator.serviceWorker.getRegistrations().then((registrations) => {
-        registrations.forEach((registration) => registration.unregister());
-      });
-  });
-}
